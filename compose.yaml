@@ -1,0 +1,127 @@
+version: "3.8"
+
+services:
+  mariadb:
+    image: mariadb:10.6
+    restart: unless-stopped
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+    environment:
+      - "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}"
+      - "MAGENTO_DATABASE_NAME=${MAGENTO_DATABASE_NAME}"
+      - "MAGENTO_DATABASE_USER=${MAGENTO_DATABASE_USER}"
+      - "MAGENTO_DATABASE_PASSWORD=${MAGENTO_DATABASE_PASSWORD}"
+
+    networks:
+      - db_network
+
+  elasticsearch:
+    image: docker.io/bitnami/elasticsearch:7
+    volumes:
+      - "elasticsearch_data:/bitnami/elasticsearch/data"
+    container_name: elastic_online
+
+  magento:
+    image: bitnami/magento:latest
+    restart: unless-stopped
+    environment:
+      - "MAGENTO_MODE=${MAGENTO_MODE}"
+      - "DATABASE_URL=${DATABASE_URL}"
+      - "MAGENTO_DATABASE_PASSWORD=${MAGENTO_DATABASE_PASSWORD}"
+      - "MAGENTO_DATABASE_HOST=${MAGENTO_DATABASE_HOST}"
+      - "MAGENTO_DATABASE_USER=${MAGENTO_DATABASE_USER}"
+      - "MAGENTO_DATABASE_NAME=${MAGENTO_DATABASE_NAME}"
+      - "MAGENTO_DATABASE_PORT_NUMBER=${MAGENTO_DATABASE_PORT_NUMBER}"
+      - "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}"
+      - "MAGENTO_SEARCH_ENGINE=${MAGENTO_SEARCH_ENGINE}"
+      - "MAGENTO_ELASTICSEARCH_HOST=${MAGENTO_ELASTICSEARCH_HOST}"
+      - "MAGENTO_ELASTICSEARCH_PORT_NUMBER=${MAGENTO_ELASTICSEARCH_PORT_NUMBER}"
+      - "MAGENTO_ELASTICSEARCH_USE_HTTPS=${MAGENTO_ELASTICSEARCH_USE_HTTPS}"
+      - "MAGENTO_ELASTICSEARCH_ENABLE_AUTH=${MAGENTO_ELASTICSEARCH_ENABLE_AUTH}"
+      - "MAGENTO_ELASTICSEARCH_USER=${MAGENTO_ELASTICSEARCH_USER}"
+      - "MAGENTO_ELASTICSEARCH_PASSWORD=${MAGENTO_ELASTICSEARCH_PASSWORD}"
+      - "ELASTICSEARCH_HOST=elasticsearch"
+      - "ELASTICSEARCH_PORT_NUMBER=9200"
+
+    working_dir: /var/www/html
+    volumes:
+      - magento_data:/bitnami/magento
+      - apache_conf:/bitnami/apache/conf
+      - magento_config:/var/www/html/var
+    networks:
+      - default
+      - db_network
+      - php_network
+
+  redis:
+    image: bitnami/redis:6.2
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    volumes:
+      - redis_data:/bitnami/redis/data
+    container_name: redis_online
+
+  # web:
+  #   image: caddy:2
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - magento
+  #   ports:
+  #     - "${HTTP_PORT}:80"
+  #     - "${HTTPS_PORT}:443"
+  #   volumes:
+  #     - "php_app:/var/www/php_app"
+  #     - "caddy_config:/etc/caddy"
+  #     - "magento_data:/bitnami/magento"
+  #   networks:
+  #     - default
+  #     - php_network
+
+  netdata:
+    image: netdata/netdata
+    container_name: netdata
+    pid: host
+    restart: unless-stopped
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - netdataconfig:/etc/netdata
+    networks:
+      - default
+
+volumes:
+  mysql_data:
+  magento_data:
+  elasticsearch_data:
+    driver: local
+  apache_conf:
+    # driver: local
+    # driver_opts:
+    #   type: none
+    #   o: bind
+    #   device: "/srv/bitnami/apache/conf"
+  magento_config:
+    driver: local
+  redis_data:
+    driver: local
+  php_app:
+    driver: local
+  # caddy_config:
+  #   driver: local
+  #   driver_opts:
+  #     type: none
+  #     o: bind
+  #     device: "${CADDY_CONFIG_PATH}"
+  netdataconfig:
+
+networks:
+  magento_network:
+    driver: bridge
+  db_network:
+    internal: true
+  php_network:
+    internal: true
